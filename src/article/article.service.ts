@@ -23,23 +23,36 @@ export class ArticleService {
     const skip = (page - 1) * limit;
 
     const queryBuilder = await this.articleRepository
-      .createQueryBuilder('articles')
+      .createQueryBuilder('article')
       .leftJoinAndSelect(
-        'articles.author',
+        'article.author',
         'author',
-        'author.id = articles.authorId',
+        'author.id = article.authorId',
       )
-      .select(['articles', 'author.id', 'author.name', 'author.email'])
-      .leftJoinAndSelect('articles.categories', 'category')
+      .leftJoin('article.categories', 'category')
+      .select([
+        'article',
+        'author.id',
+        'author.name',
+        'author.email',
+        'category.id',
+        'category.name',
+      ])
       .skip(skip)
       .take(limit);
 
     if (query.tag) {
-      queryBuilder.andWhere('articles.tagList LIKE :tag', {
+      queryBuilder.andWhere('article.tagList LIKE :tag', {
         tag: `%${query.tag}`,
       });
     }
-    queryBuilder.orderBy('articles.createdAt', 'DESC');
+    if (query.name) {
+      queryBuilder.andWhere('article.title LIKE :title', {
+        title: `%${query.name}`,
+      });
+    }
+
+    queryBuilder.orderBy('article.createdAt', 'DESC');
 
     const articles = await queryBuilder.getMany();
     const totalRows = await queryBuilder.getCount();
@@ -69,15 +82,15 @@ export class ArticleService {
       createArticleDto.tagList = [];
     }
 
-    const newPost = await this.articleRepository.create({
+    const newArticle = await this.articleRepository.create({
       ...createArticleDto,
       slug: newSlug,
       author: currentUser,
       categories: categoryEntities,
     });
-    await this.articleRepository.save(newPost);
+    await this.articleRepository.save(newArticle);
 
-    return newPost;
+    return newArticle;
   }
 
   async findBySlug(slug: string): Promise<ArticleEntity> {
@@ -102,23 +115,23 @@ export class ArticleService {
     updateArticleDto: UpdateArticleDto,
     userId: string,
   ): Promise<ArticleEntity> {
-    const updatePost = await this.findBySlug(slug);
-    if (!updatePost) {
+    const updateArticle = await this.findBySlug(slug);
+    if (!updateArticle) {
       throw new HttpException('Article does not exits', HttpStatus.NOT_FOUND);
     }
-    if (updatePost.author.id !== userId) {
+    if (updateArticle.author.id !== userId) {
       throw new HttpException('You are not author', HttpStatus.FORBIDDEN);
     }
-    if (updatePost.categories) {
+    if (updateArticle.categories) {
       const categories = await this.categoriesService.getCategoriesByIds(
         updateArticleDto.categories,
       );
       updateArticleDto.categories = categories;
     }
-    Object.assign(updatePost, updateArticleDto);
-    updatePost.updatedAt = new Date();
+    Object.assign(updateArticle, updateArticleDto);
+    updateArticle.updatedAt = new Date();
 
-    return await this.articleRepository.save(updatePost);
+    return await this.articleRepository.save(updateArticle);
   }
 
   async deleteArticle(slug: string, userId: string): Promise<DeleteResult> {
@@ -129,15 +142,51 @@ export class ArticleService {
     if (article.author.id !== userId) {
       throw new HttpException('You are not author', HttpStatus.FORBIDDEN);
     }
-
-    const categoryIds = article.categories.map((category) => category.id);
-    await this.articleRepository
-      .createQueryBuilder()
-      .relation(ArticleEntity, 'categories')
-      .of(article)
-      .remove(categoryIds);
+    await this.removeCategoriesFromArticle(article);
 
     return this.articleRepository.delete({ slug });
+  }
+
+  async getArticlesByIds(ids: string[]): Promise<ArticleEntity[]> {
+    const articles = await this.articleRepository
+      .createQueryBuilder('article')
+      .leftJoinAndSelect('article.author', 'author')
+      .leftJoin('article.categories', 'category')
+      .where('article.id IN (:...ids)', { ids: ids })
+      .select([
+        'article',
+        'author.id',
+        'author.name',
+        'author.email',
+        'category.id',
+        'category.name',
+      ])
+      .getMany();
+    if (articles.length !== ids.length) {
+      throw new HttpException('Article does not exits', HttpStatus.NOT_FOUND);
+    }
+    return articles;
+  }
+
+  async deleteManyArticle(
+    articleIds: string[],
+    userId: string,
+  ): Promise<DeleteResult> {
+    const articles = await this.getArticlesByIds(articleIds);
+
+    const isAuthorized = articles.every(
+      (article) => article.author.id === userId,
+    );
+
+    if (!isAuthorized) {
+      throw new HttpException('You are not author', HttpStatus.FORBIDDEN);
+    }
+
+    for (const article of articles) {
+      await this.removeCategoriesFromArticle(article);
+    }
+
+    return await this.articleRepository.delete(articleIds);
   }
 
   private getSlug(title: string) {
@@ -146,5 +195,14 @@ export class ArticleService {
       '-' +
       ((Math.random() * Math.pow(36, 6)) | 0).toString(36)
     );
+  }
+
+  private async removeCategoriesFromArticle(article: ArticleEntity) {
+    const categoryIds = article.categories.map((category) => category.id);
+    return await this.articleRepository
+      .createQueryBuilder()
+      .relation(ArticleEntity, 'categories')
+      .of(article)
+      .remove(categoryIds);
   }
 }

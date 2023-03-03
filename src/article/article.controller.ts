@@ -25,6 +25,7 @@ export class ArticleController {
   constructor(private readonly articleService: ArticleService) {}
 
   @ApiPagination()
+  @ApiQuery({ name: 'name', required: false })
   @ApiQuery({ name: 'tag', required: false })
   @Get()
   async findAll(@Query() query: any) {
@@ -53,6 +54,15 @@ export class ArticleController {
     @Req() req: RequestWithUser,
   ) {
     return await this.articleService.updateArticle(slug, article, req.user.id);
+  }
+
+  @Delete('delete-many')
+  @UseGuards(JwtAuthGuard)
+  async deleteArticleMany(
+    @Body('articleIds') articleIds: string[],
+    @Req() req: RequestWithUser,
+  ) {
+    return await this.articleService.deleteManyArticle(articleIds, req.user.id);
   }
 
   @Delete(':slug')
