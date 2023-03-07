@@ -1,12 +1,18 @@
 import { Exclude } from 'class-transformer';
 import ArticleEntity from 'src/article/article.entity';
+import { UploadLocalEntiy } from 'src/upload_local/upload_local.entity';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
-  Entity, OneToMany, PrimaryGeneratedColumn,
-  UpdateDateColumn
+  Entity,
+  JoinColumn,
+  OneToMany,
+  OneToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+import { Role } from './role.enum';
 
 @Entity()
 class UserEntity {
@@ -23,8 +29,24 @@ class UserEntity {
   @Exclude()
   public password: string;
 
+  @Column({
+    type: 'enum',
+    enum: Role,
+    default: Role.User
+  })
+  public roles: Role
+
   @OneToMany(() => ArticleEntity, (article: ArticleEntity) => article.author)
   public articles: ArticleEntity[];
+
+  @JoinColumn({ name: 'avatarId' })
+  @OneToOne(() => UploadLocalEntiy, {
+    nullable: true,
+  })
+  public avatar?: UploadLocalEntiy;
+
+  @Column({ nullable: true })
+  public avatarId?: string;
 
   @CreateDateColumn()
   public createdAt: Date;

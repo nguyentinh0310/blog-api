@@ -2,20 +2,20 @@ import * as Joi from '@hapi/joi';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { MulterModule } from '@nestjs/platform-express';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ArticleModule } from './article/article.module';
 import { AuthenticationModule } from './authentication/authentication.module';
+import { CategoriesModule } from './categories/categories.module';
 import { DatabaseModule } from './database/database.module';
+import { UploadLocalModule } from './upload_local/upload_local.module';
 import { UserModule } from './users/user.module';
 import { AllExceptionsFilter } from './utils/all-exceptions.filter';
 import { LoggingInterceptor } from './utils/logging.interceptor';
-import { ArticleModule } from './article/article.module';
-import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
-    UserModule,
-    AuthenticationModule,
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         POSTGRES_HOST: Joi.string().required(),
@@ -31,8 +31,14 @@ import { CategoriesModule } from './categories/categories.module';
       }),
     }),
     DatabaseModule,
+    MulterModule.register({
+      dest: './uploads'
+    }),
+    UserModule,
+    AuthenticationModule,
     ArticleModule,
     CategoriesModule,
+    UploadLocalModule,
   ],
   controllers: [AppController],
   providers: [
@@ -45,6 +51,7 @@ import { CategoriesModule } from './categories/categories.module';
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
     },
+ 
   ],
 })
 export class AppModule {}
