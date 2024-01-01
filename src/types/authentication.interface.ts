@@ -1,4 +1,4 @@
-import UserEntity from "src/users/user.entity";
+import UserEntity from '../modules/users/user.entity';
 
 export interface TokenPayLoad {
   expireIn: string;

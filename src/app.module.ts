@@ -1,38 +1,41 @@
-import * as Joi from '@hapi/joi';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { MulterModule } from '@nestjs/platform-express';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ArticleModule } from './article/article.module';
-import { AuthenticationModule } from './authentication/authentication.module';
-import { CategoriesModule } from './categories/categories.module';
-import { DatabaseModule } from './database/database.module';
-import { UploadLocalModule } from './upload_local/upload_local.module';
-import { UserModule } from './users/user.module';
-import { AllExceptionsFilter } from './utils/all-exceptions.filter';
+
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { dataSourceOptions } from '../db/data-source';
+import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import { ArticleModule } from './modules/article/article.module';
+import { AuthenticationModule } from './modules/authentication/authentication.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { UploadLocalModule } from './modules/upload_local/upload_local.module';
+import { UserModule } from './modules/users/user.module';
 import { LoggingInterceptor } from './utils/logging.interceptor';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      validationSchema: Joi.object({
-        POSTGRES_HOST: Joi.string().required(),
-        POSTGRES_PORT: Joi.number().required(),
-        POSTGRES_USER: Joi.string().required(),
-        POSTGRES_PASSWORD: Joi.string().required(),
-        POSTGRES_DB: Joi.string().required(),
-        PORT: Joi.number(),
-        SECRETKEY: Joi.string().required(),
-        EXPIRESIN: Joi.string().required(),
-        SECRETKEY_REFRESH: Joi.string().required(),
-        EXPIRESIN_REFRESH: Joi.string().required(),
+    ConfigModule.forRoot(),
+    // TypeOrmModule.forRoot(dataSourceOptions),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule], 
+      useFactory: async (configService) => ({
+        type: 'postgres',
+        host: configService.get('POSTGRES_HOST'),
+        ssl: true,
+        port: 5432,
+        username: configService.get('POSTGRES_USERNAME'),
+        password: configService.get('POSTGRES_PASSWORD'),
+        database: configService.get('POSTGRES_DATABASE'),
+        synchronize: true, // Chỉ sử dụng trong môi trường phát triển
+        autoLoadEntities: true,
       }),
+      inject: [ConfigService],
     }),
-    DatabaseModule,
     MulterModule.register({
-      dest: './uploads'
+      dest: './uploads',
     }),
     UserModule,
     AuthenticationModule,
@@ -51,7 +54,6 @@ import { LoggingInterceptor } from './utils/logging.interceptor';
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
     },
- 
   ],
 })
 export class AppModule {}
