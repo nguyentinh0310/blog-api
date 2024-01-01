@@ -10,11 +10,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { FileUploadDto } from './dto/upload_local.dto';
 import { UploadLocalService } from './upload_local.service';
 
+@ApiBearerAuth('defaultBearerAuth')
 @ApiTags('uploads')
 @Controller('uploads')
 export class UploadLocalController {
@@ -30,7 +31,7 @@ export class UploadLocalController {
     return await this.uploadLocalService.findOne(id);
   }
 
-  @Post('upload')
+  @Post()
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     type: FileUploadDto,
